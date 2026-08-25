@@ -142,3 +142,30 @@ func (s *Service) CanUnassignApprentice(ctx context.Context, currUsr *user.User)
 
 	return false, nil
 }
+
+/**
+ * Determine if this constellation of "apprenticeUsr" and "trainerUsr" is valid and check that
+ * the "currentUsr" has the permissions to trigger this action.
+ */
+func (s *Service) CanCreateReview(ctx context.Context, currUsr *user.User, tUsr *user.User, aUsr *user.User) (bool, error) {
+	allowed, err := s.assignments.IsTrainerFor(ctx, tUsr.ID, aUsr.ID)
+	if err != nil {
+		return false, fmt.Errorf("check trainer for apprentice assignment: %w", err)
+	}
+	if !allowed {
+		return false, nil
+	}
+
+	// the apprentice is assigned to the trainer -> valid constellation
+	// now we only need to check if the current user has the proper permissions
+	switch currUsr.Role {
+	case user.RoleAdmin, user.RoleTrainer:
+		return true, nil
+
+	case user.RoleApprentice:
+		return false, nil
+
+	default:
+		return false, nil
+	}
+}
