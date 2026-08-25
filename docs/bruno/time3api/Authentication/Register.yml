@@ -1,0 +1,30 @@
+info:
+  name: Register
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: http://localhost:8080/auth/register
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "team": "DIDI",
+        "email": "marko.maric@interhome.group",
+        "password": "bedranbedranbedran",
+        "firstname": "Marko",
+        "lastname": "Marić",
+        "startDate": "1998-10-03"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

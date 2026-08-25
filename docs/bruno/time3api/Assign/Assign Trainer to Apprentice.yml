@@ -1,0 +1,23 @@
+info:
+  name: Assign Trainer to Apprentice
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/assignments
+  body:
+    type: json
+    data: |-
+      {
+        "trainerID": 2,
+        "apprenticeID": 3
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

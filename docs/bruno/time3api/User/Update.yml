@@ -1,0 +1,23 @@
+info:
+  name: Update
+  type: http
+  seq: 3
+
+http:
+  method: PATCH
+  url: http://localhost:8080/user/3
+  body:
+    type: json
+    data: |-
+      {
+        "firstname": "Cameron",
+        "lastname": "Weijmer"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

@@ -1,0 +1,22 @@
+info:
+  name: Update Role
+  type: http
+  seq: 2
+
+http:
+  method: PATCH
+  url: http://localhost:8080/user/2/role
+  body:
+    type: json
+    data: |-
+      {
+        "role": "trainer"
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false

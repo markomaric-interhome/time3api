@@ -1,0 +1,16 @@
+info:
+  name: Logout
+  type: http
+  seq: 1
+
+http:
+  method: DELETE
+  url: http://localhost:8080/auth/logout
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+  forwardAuthorizationHeader: false
