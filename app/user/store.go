@@ -382,6 +382,7 @@ const queryGetAll = `
 		deleted_at,
 		last_login_at
 	FROM users
+	WHERE deleted_at IS NULL
 `
 
 const queryGetAllByRole = `

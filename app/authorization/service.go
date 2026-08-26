@@ -20,7 +20,9 @@ func NewService(assignments *assignment.Store, users *user.Store) *Service {
 	}
 }
 
-// Determine if the current user has permissions to view the target's profile
+/**
+ * Determine if the current user has permissions to view the target's profile.
+ */
 func (s *Service) CanAccessUser(ctx context.Context, currUsr *user.User, targetUsr *user.User) (bool, error) {
 	switch currUsr.Role {
 	case user.RoleAdmin:
@@ -49,37 +51,35 @@ func (s *Service) CanAccessUser(ctx context.Context, currUsr *user.User, targetU
 	}
 }
 
-// Determine if the current user has permissions to delete a user
+/**
+ * Determine if the current user has permissions to delete a user.
+ */
 func (s *Service) CanDeleteUser(ctx context.Context, currUsr *user.User) (bool, error) {
-	switch currUsr.Role {
-	case user.RoleAdmin:
-		// admins can always delete users
+	if currUsr.Role == user.RoleAdmin {
+		// admins can always delete any user
 		return true, nil
-
-	case user.RoleApprentice:
-		return false, nil
-
-	case user.RoleTrainer:
-		return false, nil
-
-	default:
-		return false, nil
 	}
+
+	// other users cannot delete a user
+	return false, nil
 }
 
-// Determine if the current user has pemissions to update the target
+/**
+ * Determine if the current user has permissions to update the target user.
+ *
+ * Admin -> Can update the information of any user.
+ * Trainer -> Can update their apprentices and themselves.
+ * Apprentice -> Cannot update users at all.
+ */
 func (s *Service) CanUpdateUser(ctx context.Context, currUsr *user.User, targetUsr *user.User) (bool, error) {
 	switch currUsr.Role {
 	case user.RoleAdmin:
-		// admins can always update user's information
 		return true, nil
 
 	case user.RoleApprentice:
-		// apprentices can never update user information
-		return currUsr.Role == targetUsr.Role, nil
+		return false, nil
 
 	case user.RoleTrainer:
-		// trainers can update user information for their apprentices
 		allowed, err := s.assignments.IsTrainerFor(ctx, currUsr.ID, targetUsr.ID)
 		if err != nil {
 			return false, fmt.Errorf("check trainer for apprentice access: %w", err)
@@ -92,20 +92,16 @@ func (s *Service) CanUpdateUser(ctx context.Context, currUsr *user.User, targetU
 	}
 }
 
-// Determine if the current user has permissions to update the target's role
-func (s *Service) CanUpdateUserRole(ctx context.Context, currUsr *user.User) (bool, error) {
-	if currUsr.Role == user.RoleAdmin {
-		return true, nil
-	}
-
-	return false, nil
-}
-
 /**
- * Determine if the current user has permissions to assign an apprentice to a trainer.
+ * Determine if the current user has the permissions to assign an apprentice to a trainer. This
+ * will also make sure that the "trainer" is a trainer and that the "apprentice" is an apprentice.
+ *
+ * -> Admin -> Can create a valid assignment between apprentice and trainer.
+ * -> Trainer -> Cannot create a valid assignment.
+ * -> Apprentice -> Cannot create a valid assignment.
  */
 func (s *Service) CanAssignApprentice(ctx context.Context, currUsr *user.User, trainer *user.User, apprentice *user.User) (bool, error) {
-	// first check if both apprentice and trainer have the proper roles
+	// first, make sure this is a valid assignment
 	if trainer.Role != user.RoleTrainer && trainer.Role != user.RoleAdmin {
 		return false, nil
 	}
@@ -114,28 +110,6 @@ func (s *Service) CanAssignApprentice(ctx context.Context, currUsr *user.User, t
 	}
 
 	// check the permissions of the current user
-	switch currUsr.Role {
-	case user.RoleAdmin:
-		// admins can always create valid assignments
-		return true, nil
-
-	case user.RoleTrainer:
-		// trainers cannot create any assignments for now
-		return false, nil
-
-	case user.RoleApprentice:
-		// apprentices cannot create any assignments
-		return false, nil
-
-	default:
-		return false, nil
-	}
-}
-
-/**
- * Determine if the current user has permissions to unassign an apprentice from a trainer.
- */
-func (s *Service) CanUnassignApprentice(ctx context.Context, currUsr *user.User) (bool, error) {
 	if currUsr.Role == user.RoleAdmin {
 		return true, nil
 	}
@@ -144,28 +118,16 @@ func (s *Service) CanUnassignApprentice(ctx context.Context, currUsr *user.User)
 }
 
 /**
- * Determine if this constellation of "apprenticeUsr" and "trainerUsr" is valid and check that
- * the "currentUsr" has the permissions to trigger this action.
+ * Determine if the current user has the permissions to unassign an apprentice from a trainer.
+ *
+ * Admin -> Yes, can revoke an assignment between apprentice and trainer.
+ * Trainer -> No
+ * Apprentice -> No
  */
-func (s *Service) CanCreateReview(ctx context.Context, currUsr *user.User, tUsr *user.User, aUsr *user.User) (bool, error) {
-	allowed, err := s.assignments.IsTrainerFor(ctx, tUsr.ID, aUsr.ID)
-	if err != nil {
-		return false, fmt.Errorf("check trainer for apprentice assignment: %w", err)
-	}
-	if !allowed {
-		return false, nil
-	}
-
-	// the apprentice is assigned to the trainer -> valid constellation
-	// now we only need to check if the current user has the proper permissions
-	switch currUsr.Role {
-	case user.RoleAdmin, user.RoleTrainer:
+func (s *Service) CanUnassignApprentice(ctx context.Context, currUsr *user.User) (bool, error) {
+	if currUsr.Role == user.RoleAdmin {
 		return true, nil
-
-	case user.RoleApprentice:
-		return false, nil
-
-	default:
-		return false, nil
 	}
+
+	return false, nil
 }

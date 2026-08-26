@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+
 	"time3api/app/assignment"
-	"time3api/app/auth"
 	"time3api/app/authorization"
 	"time3api/app/user"
 )
@@ -27,28 +27,20 @@ func NewAssignmentHandler(assigns *assignment.Store, users *user.Store, authz *a
 }
 
 /**
- * Assign an apprentice user to a trainer user. It will automatically validate if the target
- * users have the proper roles for this operation.
+ * Assign an apprentice to a trainer. It will automatically validate if both target users
+ * have the required roles for this operation to succeed.
  */
 func (h *AssignmentHandler) Create(w http.ResponseWriter, r *http.Request) {
-	currUsr, ok := auth.UserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// decode the request body
 	var req assignment.CreateAssignmentRequest
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
-
 	if err := decoder.Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	// get the target users
-	trainerUsr, err := h.users.GetByID(r.Context(), req.TrainerID)
+	// get the trainer
+	trainer, err := h.users.GetByID(r.Context(), req.TrainerID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "trainer not found", http.StatusNotFound)
@@ -59,7 +51,8 @@ func (h *AssignmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	apprenticeUsr, err := h.users.GetByID(r.Context(), req.ApprenticeID)
+	// get the apprentice
+	apprentice, err := h.users.GetByID(r.Context(), req.ApprenticeID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "apprentice not found", http.StatusNotFound)
@@ -70,20 +63,19 @@ func (h *AssignmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed, err := h.authz.CanAssignApprentice(r.Context(), currUsr, trainerUsr, apprenticeUsr)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+	// check if both "trainer" and "apprentice" have the proper roles
+	if trainer.Role != user.RoleTrainer && trainer.Role != user.RoleAdmin {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-
-	if !allowed {
+	if apprentice.Role != user.RoleApprentice {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	ass, err := h.assigns.Assign(r.Context(), trainerUsr.ID, apprenticeUsr.ID)
+	ass, err := h.assigns.Assign(r.Context(), trainer.ID, apprentice.ID)
 	if err != nil {
-		http.Error(w, "internal server error assign", http.StatusInternalServerError)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
@@ -99,40 +91,22 @@ func (h *AssignmentHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * Delete an assignment between an apprentice and their trainer.
+ * Unassign an apprentice from a trainer.
  */
 func (h *AssignmentHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	currUsr, ok := auth.UserFromContext(r.Context())
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// parse the target user id's from the url
-	trainerId, err := strconv.ParseInt(r.PathValue("tID"), 10, 64)
+	tID, err := strconv.ParseInt(r.PathValue("tID"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid trainer id", http.StatusBadRequest)
 		return
 	}
 
-	apprenticeId, err := strconv.ParseInt(r.PathValue("aID"), 10, 64)
+	aID, err := strconv.ParseInt(r.PathValue("aID"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid apprentice id", http.StatusBadRequest)
 		return
 	}
 
-	allowed, err := h.authz.CanUnassignApprentice(r.Context(), currUsr)
-	if err != nil {
-		http.Error(w, "internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	if !allowed {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-
-	if err := h.assigns.Unassign(r.Context(), trainerId, apprenticeId); err != nil {
+	if err := h.assigns.Unassign(r.Context(), tID, aID); err != nil {
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}

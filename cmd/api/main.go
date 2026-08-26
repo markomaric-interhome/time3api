@@ -13,7 +13,6 @@ import (
 	"time3api/app/authorization"
 	"time3api/app/database"
 	"time3api/app/handler"
-	"time3api/app/review"
 	"time3api/app/user"
 
 	"github.com/joho/godotenv"
@@ -62,7 +61,6 @@ func main() {
 	// 3. create the necessary database stores, handlers, managers, services, etc.
 	// ---------------------------------------------------------------------------
 	assignmentStore := assignment.NewStore(db)
-	reviewStore := review.NewStore(db)
 	userStore := user.NewStore(db)
 
 	tokenManager := auth.NewTokenManager(jwtSecret, "time3api", 8*time.Hour)
@@ -73,31 +71,27 @@ func main() {
 	authHandler := auth.NewHandler(userStore, tokenManager)
 	userHandler := handler.NewUserHandler(userStore, assignmentStore, authzService)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentStore, userStore, authzService)
-	reviewHandler := handler.NewReviewHandler(reviewStore, userStore, authzService)
 
 	// 4. setup the routes
 	// -------------------
 	mux := http.NewServeMux()
 
-	// authentication endpoints
+	// authentication
 	mux.HandleFunc("POST /auth/register", authHandler.Register)
 	mux.HandleFunc("POST /auth/login", authHandler.Login)
 	mux.HandleFunc("DELETE /auth/logout", authHandler.Logout)
 	mux.Handle("GET /auth/me", authHandler.Authenticate(http.HandlerFunc(authHandler.Me)))
 
-	// user endpoints
+	// user
+	mux.Handle("GET /user", authHandler.Authenticate(http.HandlerFunc(userHandler.List)))
 	mux.Handle("GET /user/{id}", authHandler.Authenticate(http.HandlerFunc(userHandler.Details)))
-	mux.Handle("DELETE /user/{id}", authHandler.Authenticate(http.HandlerFunc(userHandler.Delete)))
+	mux.Handle("DELETE /user/{id}", authHandler.Authenticate(authorization.RequireRole(user.RoleAdmin)(http.HandlerFunc(userHandler.Delete))))
 	mux.Handle("PATCH /user/{id}", authHandler.Authenticate(http.HandlerFunc(userHandler.Update)))
-	mux.Handle("PATCH /user/{id}/role", authHandler.Authenticate(http.HandlerFunc(userHandler.UpdateRole)))
+	mux.Handle("PATCH /user/{id}/role", authHandler.Authenticate(authorization.RequireRole(user.RoleAdmin)(http.HandlerFunc(userHandler.UpdateRole))))
 
-	// assignment endpoints
-	mux.Handle("POST /assignments", authHandler.Authenticate(http.HandlerFunc(assignmentHandler.Create)))
-	mux.Handle("DELETE /assignments/{tID}/{aID}", authHandler.Authenticate(http.HandlerFunc(assignmentHandler.Delete)))
-
-	// review endpoints
-	mux.Handle("POST /reviews", authHandler.Authenticate(http.HandlerFunc(reviewHandler.Create)))
-	mux.Handle("DELETE /reviews/{id}", authHandler.Authenticate(http.HandlerFunc(reviewHandler.Delete)))
+	// assignment
+	mux.Handle("POST /assignments", authHandler.Authenticate(authorization.RequireRole(user.RoleAdmin)(http.HandlerFunc(assignmentHandler.Create))))
+	mux.Handle("DELETE /assignments/{tID}/{aID}", authHandler.Authenticate(authorization.RequireRole(user.RoleAdmin)(http.HandlerFunc(assignmentHandler.Delete))))
 
 	// 5. start the server and listen for incoming requests
 	// ----------------------------------------------------
